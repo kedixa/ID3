@@ -7,6 +7,7 @@
 
 #include "ID3.h"
 
+const double ID3::log2 = log(2);
 ID3::ID3()
 {
 	root = nullptr;
@@ -18,6 +19,8 @@ ID3::ID3()
  */
 bool ID3::_del_tree(ID3_Node* p)
 {
+	if(p == nullptr)
+		return true;
 	for(int i = 0; i < (int)p->child.size(); ++i)
 	{
 		_del_tree(p->child[i]);
@@ -94,6 +97,77 @@ bool ID3::set_data(vvs& d, std::string& s, vs& h)
 }
 
 /*
+ * function: ID3::_entropy 计算数据集的熵
+ * data_list: 数据集
+ *
+ */
+double ID3::_entropy(const vi& data_list)
+{
+	double entropy_sv = 0;
+	double data_size = (double)data_list.size();
+	vi tmp;
+	tmp.resize(int_to_attr[target].size(), 0);
+	for(auto &j : data_list)
+		++tmp[datas[target][j]];
+	for(int i = 0; i < (int)tmp.size(); ++i)
+	{
+		if(tmp[i] != 0)
+		{
+			double d = tmp[i] / data_size;
+			entropy_sv -= d * log(d) / log2;
+		}
+	}
+	return entropy_sv;
+}
+
+/*
+ * function: ID3::_gain 获取以当前属性进行分支对数据集的增益
+ * data_list: 数据集
+ * attr: 属性
+ *
+ */
+double ID3::_gain(const vi& data_list, int attr)
+{
+	double entropy_S = _entropy(data_list);
+	double data_size = (double)data_list.size();
+	// 按照当前属性将数据集分成子数据集
+	vvi data_i;
+	data_i.resize(int_to_attr[attr].size());
+	for(auto& j : data_list)
+		data_i[datas[attr][j]].push_back(j);
+	// 求信息增益
+	double sub_entropy = 0;
+	for(int i = 0; i < (int)data_i.size(); ++i)
+		sub_entropy += data_i[i].size() * _entropy(data_i[i]) / data_size;
+
+	return entropy_S - sub_entropy;
+}
+
+/*
+ *
+ * function: _find_best_attr 查找当前最优的属性
+ * data_list: 当前数据集
+ * attr_list: 当前属性集
+ * current_gain: 保存最优属性对应的增益值
+ *
+ */
+int ID3::_find_best_attr(const vi& data_list, 
+		const vi& attr_list,
+		double& best_gain)
+{
+	best_gain = -1;
+	int best_attr = -1;
+	for(auto &attr : attr_list)
+	{
+		double current_gain = _gain(data_list, attr);
+		if(best_gain < current_gain)
+			best_gain = current_gain, best_attr = attr;
+	}
+	assert(best_attr != -1);
+	return best_attr;
+}
+
+/*
  * function: ID3::build_tree 递归构建决策树
  * data_list: 当前数据集列表
  * attr_list: 当前属性列表
@@ -132,12 +206,15 @@ ID3_Node* ID3::_build_tree(const vi& data_list, const vi& attr_list)
 			if(max_value < tmp[i])
 				max_value = tmp[i], max_index = i;
 		node->target_value = max_index;
+		node->gain = 0;
 	}
 	else
 	{
 		// 使用最好的属性来建立分支
-		int best_attr = _find_best_attr(dl, al);
+		double current_gain;
+		int best_attr = _find_best_attr(dl, al, current_gain);
 		node->attr_index = best_attr;
+		node->gain = current_gain;
 		int attr_size = (int)int_to_attr[best_attr].size();
 
 		// 按照属性值分离数据集
@@ -168,6 +245,7 @@ ID3_Node* ID3::_build_tree(const vi& data_list, const vi& attr_list)
 				p = new ID3_Node;
 				p->attr_index = target;
 				p->target_value = max_index;
+				p->gain = 0;
 			}
 			else
 			{
@@ -206,6 +284,78 @@ bool ID3::run()
 	if(root == nullptr)
 		return false;
 	return true;
+}
+
+/*
+ * function: _print
+ * p: 子树根节点指针
+ * depth: 当前深度
+ * out: 输出流对象
+ *
+ */
+int ID3::_print(ID3_Node* p, int depth, std::ostream& out)
+{
+	if(p == nullptr)
+		return 0;
+	out<<std::string(depth, '.');
+	if(p->attr_index == target)
+	{
+		out<<target_attr<<' '<<
+			int_to_attr[target][p->target_value]<<std::endl;
+		return 0;
+	}
+	out<<headers[p->attr_index]<<"\tgain:\t"<<p->gain<<std::endl;
+	for(int i = 0; i < (int)p->child.size(); ++i)
+		_print(p->child[i], depth + 1, out);
+	return 0;
+}
+
+int ID3::_print_dot(ID3_Node* p, int& node_index, std::ostream& out)
+{
+	if(p == nullptr)
+		return 0;
+	int current_index = node_index ++;
+	if(p->attr_index == target)
+	{
+		out<<"\tnode"<<current_index<<" [shape = none, label = \""
+			<<int_to_attr[target][p->target_value]<<"\"];\n";
+		return current_index;
+	}
+	out<<"\tnode"<<current_index<<" [shape = box, label = \""
+		<<headers[p->attr_index]<<"\"];\n";
+	for(int i = 0; i < (int)p->child.size(); ++i)
+	{
+		int this_child_index = _print_dot(p->child[i], node_index, out);
+		out<<"\tnode"<<current_index<<" -> node"<<this_child_index<<
+			" [label = \""<<int_to_attr[p->attr_index][i]<<"\"];\n";
+	}
+	return current_index;
+}
+/*
+ * function: print 输出树形结构
+ * out: 输出流对象
+ *
+ */
+void ID3::print(std::ostream& out = std::cout)
+{
+	if(root == nullptr)
+		return;
+	_print(root, 0, out);
+}
+
+/*
+ * fucntion: ID3::print_dot 以dot格式输出
+ *
+ */
+void ID3::print_dot(std::ostream& out = std::cout)
+{
+	if(root == nullptr)
+		return;
+	out<<"digraph G\n{\n";
+	int node_index = 0;
+	_print_dot(root, node_index,  out);
+	out<<"}\n";
+	out.flush();
 }
 
 ID3::~ID3()
