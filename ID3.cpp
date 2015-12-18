@@ -322,7 +322,7 @@ int ID3::_print_dot(ID3_Node* p, int& node_index, std::ostream& out)
 		return current_index;
 	}
 	out<<"\tnode"<<current_index<<" [shape = box, label = \""
-		<<headers[p->attr_index]<<"\"];\n";
+		<<headers[p->attr_index]<<"\\ngain = "<<p->gain<<"\"];\n";
 	for(int i = 0; i < (int)p->child.size(); ++i)
 	{
 		int this_child_index = _print_dot(p->child[i], node_index, out);
