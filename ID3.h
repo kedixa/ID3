@@ -43,20 +43,25 @@ private:
 	vusi attr_to_int; // 属性到整数的映射
 	vvs int_to_attr; // 整数到属性的映射
 	int num_attr; // 属性数量
+	int num_data; // 数据集大小
 	int target; // 目标属性在headers中的下标
 	ID3_Node* root; // 决策树根结点指针
 
 	bool init(); // 初始化
-	ID3_Node* build_tree(vi, vi);
-	int find_best_attr(vi, vi);
-	int _print(std::ostream&, ID3_Node*, int);
-	int _print_dot(std::ostream&, ID3_Node*, int);
+	ID3_Node* _build_tree(const vi&, const vi&);
+	int _find_best_attr(const vi&, const vi&);
+	int _print(ID3_Node*, int, std::ostream&);
+	int _print_dot(ID3_Node*, int, std::ostream&);
+	bool _del_tree(ID3_Node*);
+	double _gain(const vi&, int);
+	double _entropy(const vi&);
 
 public:
 	ID3();
 	bool set_data(vvs&, std::string&, vs&);
 	bool run();
 	void print(std::ostream&);
+	bool clear();
 	~ID3();
 };
 
