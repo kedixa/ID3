@@ -14,7 +14,7 @@ ID3::ID3()
 }
 
 /*
- * function: ID3::del_tree 删除决策树
+ * function: ID3::_del_tree 删除决策树
  *
  */
 bool ID3::_del_tree(ID3_Node* p)
@@ -39,6 +39,7 @@ bool ID3::clear()
 	datas.clear();
 	attr_to_int.clear();
 	int_to_attr.clear();
+	attrs_size.clear();
 	bool f = _del_tree(root);
 	if(f) root = nullptr;
 	return f;
@@ -64,6 +65,7 @@ bool ID3::set_data(vvs& d, std::string& s, vs& h)
 	attr_to_int.resize(num_attr);
 	datas.resize(num_attr);
 	int_to_attr.resize(num_attr);
+	attrs_size.resize(num_attr);
 
 	// 数据集映射到整数域，便于计算
 	for(int i = 0; i < num_data; ++i)
@@ -78,10 +80,15 @@ bool ID3::set_data(vvs& d, std::string& s, vs& h)
 				it = attr_to_int[j].find(e[j]);
 				int_to_attr[j].push_back(e[j]);
 			}
+			// datas按列保存是因为多数访问只是对每个属性进行访问
+			// 所以datas[i][j] 保存的是第j条数据的第i个属性是什么
 			datas[j].push_back(it->second);
 		}
 	}
 	
+	for(int i = 0; i < num_attr; ++i)
+		attrs_size[i] = (int)int_to_attr[i].size();
+
 	// 确定目标属性
 	target = -1;
 	for(int i = 0; i < num_attr; ++i)
@@ -106,7 +113,7 @@ double ID3::_entropy(const vi& data_list)
 	double entropy_sv = 0;
 	double data_size = (double)data_list.size();
 	vi tmp;
-	tmp.resize(int_to_attr[target].size(), 0);
+	tmp.resize(attrs_size[target], 0);
 	for(auto &j : data_list)
 		++tmp[datas[target][j]];
 	for(int i = 0; i < (int)tmp.size(); ++i)
@@ -132,7 +139,7 @@ double ID3::_gain(const vi& data_list, int attr)
 	double data_size = (double)data_list.size();
 	// 按照当前属性将数据集分成子数据集
 	vvi data_i;
-	data_i.resize(int_to_attr[attr].size());
+	data_i.resize(attrs_size[attr]);
 	for(auto& j : data_list)
 		data_i[datas[attr][j]].push_back(j);
 	// 求信息增益
@@ -177,20 +184,21 @@ int ID3::_find_best_attr(const vi& data_list,
 ID3_Node* ID3::_build_tree(const vi& data_list, const vi& attr_list)
 {
 	// 当前数据集中的一个目标属性值
-	auto &dl = data_list;
-	auto &al = attr_list;
-	int one_of_target = datas[target][dl[0]];
-	ID3_Node* node = new ID3_Node;
-	bool flag = std::all_of(dl.begin(), dl.end(),[&](int x)
+	auto      &dl           = data_list;
+	auto      &al           = attr_list;
+	int       one_of_target = datas[target][dl[0]];
+	ID3_Node* node          = new ID3_Node;
+	bool      flag          = std::all_of(dl.begin(), dl.end(),[&](int x)
 			{
-			return (datas[target][x] == one_of_target);
+				return (datas[target][x] == one_of_target);
 			});
+
 	// 如果当前数据集所有目标属性相同，则建立一个叶子结点
 	if(flag)
 	{
-		node->attr_index = target;
+		node->attr_index   = target;
 		node->target_value = one_of_target;
-		node->gain = 0;
+		node->gain         = 0;
 	}
 	// 如果当前属性值为空，则建立一个叶结点
 	// 值为当前数据集中出现次数最多的目标属性值
@@ -198,7 +206,7 @@ ID3_Node* ID3::_build_tree(const vi& data_list, const vi& attr_list)
 	{
 		node->attr_index = target;
 		vi tmp;
-		tmp.resize(int_to_attr[target].size(), 0);
+		tmp.resize(attrs_size[target], 0);
 		for(auto& i : dl)
 			++tmp[datas[target][i]];
 		int max_index = -1, max_value = -1;
@@ -212,10 +220,10 @@ ID3_Node* ID3::_build_tree(const vi& data_list, const vi& attr_list)
 	{
 		// 使用最好的属性来建立分支
 		double current_gain;
-		int best_attr = _find_best_attr(dl, al, current_gain);
+		int best_attr    = _find_best_attr(dl, al, current_gain);
 		node->attr_index = best_attr;
-		node->gain = current_gain;
-		int attr_size = (int)int_to_attr[best_attr].size();
+		node->gain       = current_gain;
+		int attr_size    = attrs_size[best_attr];
 
 		// 按照属性值分离数据集
 		vvi data_i;
@@ -225,8 +233,6 @@ ID3_Node* ID3::_build_tree(const vi& data_list, const vi& attr_list)
 
 		for(int i = 0; i < attr_size; ++i)
 		{
-			//FIXME attr_value 多余？
-			node->attr_value.push_back(i);
 			ID3_Node* p = nullptr;
 
 			// 如果当前属性值对应的数据集为空，建立叶结点
@@ -242,10 +248,10 @@ ID3_Node* ID3::_build_tree(const vi& data_list, const vi& attr_list)
 					if(max_value < tmp[k])
 						max_value = tmp[k], max_index = k;
 
-				p = new ID3_Node;
-				p->attr_index = target;
+				p               = new ID3_Node;
+				p->attr_index   = target;
 				p->target_value = max_index;
-				p->gain = 0;
+				p->gain         = 0;
 			}
 			else
 			{
@@ -352,7 +358,7 @@ void ID3::print_dot(std::ostream& out = std::cout)
 	if(root == nullptr)
 		return;
 	out<<"digraph G\n{\n";
-	int node_index = 0;
+	int node_index = 0; // 深度优先遍历序号
 	_print_dot(root, node_index,  out);
 	out<<"}\n";
 	out.flush();

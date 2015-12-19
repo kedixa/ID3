@@ -67,6 +67,6 @@ int main()
 	string target = "PlayTennis";
 	id3.set_data(datas, target, header);
 	id3.run();
-	id3.print_dot(cout);
+	id3.print(cout);
 	return 0;
 }
