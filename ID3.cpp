@@ -7,6 +7,8 @@
 
 #include "ID3.h"
 
+namespace kedixa{
+
 const double ID3::log2 = log(2);
 ID3::ID3()
 {
@@ -368,3 +370,5 @@ ID3::~ID3()
 {
 	clear();
 }
+
+} // namespace kedixa

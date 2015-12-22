@@ -15,6 +15,8 @@
 #ifndef ID3_H_
 #define ID3_H_
 
+namespace kedixa{
+
 class ID3;
 class ID3_Node
 {
@@ -66,4 +68,5 @@ public:
 	~ID3();
 };
 
+} // namespace kedixa
 #endif // ID3_H_

@@ -7,6 +7,7 @@
 #include<cmath>
 #include "ID3.h"
 using namespace std;
+using namespace kedixa;
 
 /*
  * function: read_data
