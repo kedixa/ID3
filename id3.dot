@@ -1,0 +1,18 @@
+digraph G
+{
+	node0 [shape = box, label = "Outlook\ngain = 0.24675"];
+	node1 [shape = box, label = "Humidity\ngain = 0.970951"];
+	node2 [shape = none, label = "No"];
+	node1 -> node2 [label = "High"];
+	node3 [shape = none, label = "Yes"];
+	node1 -> node3 [label = "Normal"];
+	node0 -> node1 [label = "Sunny"];
+	node4 [shape = none, label = "Yes"];
+	node0 -> node4 [label = "Overcast"];
+	node5 [shape = box, label = "Wind\ngain = 0.970951"];
+	node6 [shape = none, label = "Yes"];
+	node5 -> node6 [label = "Weak"];
+	node7 [shape = none, label = "No"];
+	node5 -> node7 [label = "Strong"];
+	node0 -> node5 [label = "Rain"];
+}
